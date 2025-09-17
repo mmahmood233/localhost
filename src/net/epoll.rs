@@ -114,7 +114,13 @@ impl EpollServer {
                     stream.set_nonblocking(true)?;
                     
                     let fd = stream.as_raw_fd();
-                    let conn = Connection::new(stream, addr);
+                    let conn = match Connection::new(stream, addr) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            eprintln!("Failed to create connection: {}", e);
+                            continue;
+                        }
+                    };
                     
                     // Add to kqueue
                     let mut kevent = libc::kevent {

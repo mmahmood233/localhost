@@ -1,8 +1,9 @@
 use std::io::{self, Read, Write, ErrorKind};
 use std::net::{TcpStream, SocketAddr};
 use crate::http::parse::HttpParser;
-use crate::http::request::HttpRequest;
+use crate::http::request::{HttpRequest, Method};
 use crate::http::response::HttpResponse;
+use crate::fs::static_files::StaticFileServer;
 
 pub struct Connection {
     stream: TcpStream,
@@ -12,11 +13,19 @@ pub struct Connection {
     write_pos: usize,
     current_request: Option<HttpRequest>,
     keep_alive: bool,
+    static_server: StaticFileServer,
 }
 
 impl Connection {
-    pub fn new(stream: TcpStream, addr: SocketAddr) -> Self {
-        Connection {
+    pub fn new(stream: TcpStream, addr: SocketAddr) -> io::Result<Self> {
+        // Create static file server with default document root
+        let static_server = StaticFileServer::new("./www", None)
+            .unwrap_or_else(|_| {
+                // Fallback to current directory if ./www doesn't exist
+                StaticFileServer::new(".", None).expect("Failed to create static file server")
+            });
+        
+        Ok(Connection {
             stream,
             addr,
             parser: HttpParser::new(),
@@ -24,7 +33,8 @@ impl Connection {
             write_pos: 0,
             current_request: None,
             keep_alive: false,
-        }
+            static_server,
+        })
     }
     
     pub fn addr(&self) -> SocketAddr {
@@ -100,23 +110,48 @@ impl Connection {
     }
     
     fn generate_response(&self, request: &HttpRequest) -> io::Result<HttpResponse> {
-        // For now, just return a simple response based on the path
-        match request.path.as_str() {
-            "/" => {
-                let mut response = HttpResponse::ok();
-                response.set_body_string("Hello from Localhost HTTP Server!");
+        // Check if method is allowed
+        match request.method {
+            Method::GET | Method::HEAD => {
+                // Serve static files
+                match self.static_server.serve_file(&request.path) {
+                    Ok(mut response) => {
+                        // For HEAD requests, remove the body but keep headers
+                        if matches!(request.method, Method::HEAD) {
+                            response.body.clear();
+                            response.set_header("Content-Length", "0");
+                        }
+                        Ok(response)
+                    }
+                    Err(e) => {
+                        eprintln!("Error serving static file {}: {}", request.path, e);
+                        Ok(HttpResponse::internal_server_error())
+                    }
+                }
+            }
+            Method::POST => {
+                // POST not implemented yet - return 405
+                let mut response = HttpResponse::new(405);
+                response.set_body_string("405 Method Not Allowed - POST not yet implemented");
                 response.set_header("Content-Type", "text/plain");
+                response.set_header("Allow", "GET, HEAD");
                 Ok(response)
             }
-            "/hello" => {
-                let mut response = HttpResponse::ok();
-                response.set_body_string("Hello, World!");
+            Method::DELETE => {
+                // DELETE not implemented yet - return 405
+                let mut response = HttpResponse::new(405);
+                response.set_body_string("405 Method Not Allowed - DELETE not yet implemented");
                 response.set_header("Content-Type", "text/plain");
+                response.set_header("Allow", "GET, HEAD");
                 Ok(response)
             }
             _ => {
-                // Return 404 for unknown paths
-                Ok(HttpResponse::not_found())
+                // Other methods not supported - return 405
+                let mut response = HttpResponse::new(405);
+                response.set_body_string("405 Method Not Allowed");
+                response.set_header("Content-Type", "text/plain");
+                response.set_header("Allow", "GET, HEAD");
+                Ok(response)
             }
         }
     }

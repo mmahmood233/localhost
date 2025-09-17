@@ -3,6 +3,8 @@ mod net;
 mod http;
 mod config;
 mod errors;
+mod mime;
+mod fs;
 
 use std::process;
 use server::Server;

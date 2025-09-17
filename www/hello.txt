@@ -1,0 +1,12 @@
+Hello from a static text file!
+
+This file is being served by our Localhost HTTP server with proper MIME type detection.
+
+Features demonstrated:
+- Static file serving
+- MIME type detection (text/plain)
+- Proper HTTP headers
+- Keep-alive connections
+
+Server: Localhost HTTP/1.1 Server
+Built with Rust 🦀
