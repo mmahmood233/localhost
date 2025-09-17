@@ -1,0 +1,14 @@
+[package]
+name = "localhost"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+# We'll add test dependencies as needed
+
+[[bin]]
+name = "localhost"
+path = "src/main.rs"
