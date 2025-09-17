@@ -1,13 +1,17 @@
 use std::io::{self, Read, Write, ErrorKind};
 use std::net::{TcpStream, SocketAddr};
+use crate::http::parse::HttpParser;
+use crate::http::request::HttpRequest;
+use crate::http::response::HttpResponse;
 
 pub struct Connection {
     stream: TcpStream,
     addr: SocketAddr,
-    read_buffer: Vec<u8>,
+    parser: HttpParser,
     write_buffer: Vec<u8>,
     write_pos: usize,
-    request_complete: bool,
+    current_request: Option<HttpRequest>,
+    keep_alive: bool,
 }
 
 impl Connection {
@@ -15,10 +19,11 @@ impl Connection {
         Connection {
             stream,
             addr,
-            read_buffer: Vec::with_capacity(8192),
+            parser: HttpParser::new(),
             write_buffer: Vec::new(),
             write_pos: 0,
-            request_complete: false,
+            current_request: None,
+            keep_alive: false,
         }
     }
     
@@ -37,17 +42,28 @@ impl Connection {
                     return Err(io::Error::new(ErrorKind::UnexpectedEof, "Client closed connection"));
                 }
                 Ok(n) => {
-                    self.read_buffer.extend_from_slice(&temp_buf[..n]);
-                    
-                    // Simple check for end of HTTP headers (minimal for now)
-                    if self.read_buffer.windows(4).any(|w| w == b"\r\n\r\n") {
-                        self.request_complete = true;
-                        return Ok(true);
-                    }
-                    
-                    // Prevent buffer from growing too large
-                    if self.read_buffer.len() > 64 * 1024 {
-                        return Err(io::Error::new(ErrorKind::InvalidData, "Request too large"));
+                    // Parse the incoming data
+                    match self.parser.parse(&temp_buf[..n]) {
+                        Ok(Some(request)) => {
+                            // Request parsing complete
+                            println!("Parsed request: {} {}", request.method.as_str(), request.path);
+                            
+                            // Validate required headers for HTTP/1.1
+                            if request.version == "HTTP/1.1" && request.host().is_none() {
+                                return Err(io::Error::new(ErrorKind::InvalidData, "Missing Host header for HTTP/1.1"));
+                            }
+                            
+                            self.keep_alive = request.connection_keep_alive();
+                            self.current_request = Some(request);
+                            return Ok(true);
+                        }
+                        Ok(None) => {
+                            // Need more data, continue reading
+                        }
+                        Err(e) => {
+                            // Parse error
+                            return Err(e);
+                        }
                     }
                 }
                 Err(e) if e.kind() == ErrorKind::WouldBlock => {
@@ -60,22 +76,49 @@ impl Connection {
             }
         }
         
-        Ok(self.request_complete)
+        Ok(false)
     }
     
     /// Prepare and queue the HTTP response
     pub fn send_response(&mut self) -> io::Result<()> {
-        if !self.request_complete {
-            return Err(io::Error::new(ErrorKind::InvalidInput, "Request not complete"));
-        }
+        let request = match &self.current_request {
+            Some(req) => req,
+            None => return Err(io::Error::new(ErrorKind::InvalidInput, "No request to respond to")),
+        };
         
-        // Simple HTTP/1.1 response
-        let response = b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\nServer: Localhost\r\n\r\nHello";
+        // Generate response based on request
+        let mut response = self.generate_response(request)?;
         
-        self.write_buffer = response.to_vec();
+        // Set connection header based on keep-alive preference
+        response.set_keep_alive(self.keep_alive);
+        
+        // Convert to bytes and queue for sending
+        self.write_buffer = response.to_bytes();
         self.write_pos = 0;
         
         Ok(())
+    }
+    
+    fn generate_response(&self, request: &HttpRequest) -> io::Result<HttpResponse> {
+        // For now, just return a simple response based on the path
+        match request.path.as_str() {
+            "/" => {
+                let mut response = HttpResponse::ok();
+                response.set_body_string("Hello from Localhost HTTP Server!");
+                response.set_header("Content-Type", "text/plain");
+                Ok(response)
+            }
+            "/hello" => {
+                let mut response = HttpResponse::ok();
+                response.set_body_string("Hello, World!");
+                response.set_header("Content-Type", "text/plain");
+                Ok(response)
+            }
+            _ => {
+                // Return 404 for unknown paths
+                Ok(HttpResponse::not_found())
+            }
+        }
     }
     
     /// Handle write event. Returns Ok(true) if all data sent, Ok(false) if more data to send
@@ -99,7 +142,25 @@ impl Connection {
             }
         }
         
-        // All data sent
-        Ok(true)
+        // All data sent - check if we should keep the connection alive
+        if self.keep_alive {
+            // Reset for next request
+            self.reset_for_next_request();
+            Ok(false) // Don't close connection, wait for next request
+        } else {
+            Ok(true) // Close connection
+        }
+    }
+    
+    fn reset_for_next_request(&mut self) {
+        self.parser.reset();
+        self.write_buffer.clear();
+        self.write_pos = 0;
+        self.current_request = None;
+        // keep_alive stays the same for the connection
+    }
+    
+    pub fn should_keep_alive(&self) -> bool {
+        self.keep_alive && self.current_request.is_none()
     }
 }
