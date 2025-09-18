@@ -4,6 +4,7 @@ use std::net::TcpListener;
 use std::os::unix::io::{AsRawFd, RawFd};
 use libc::{self, c_int};
 use crate::net::conn::Connection;
+use crate::net::timeout::{TimeoutManager, TimeoutConfig, ConnectionState};
 
 const MAX_EVENTS: usize = 1024;
 const TIMEOUT_MS: c_int = 1000;
@@ -15,6 +16,7 @@ pub struct EventLoop {
     #[cfg(target_os = "linux")]
     epoll_fd: RawFd,
     connections: HashMap<RawFd, Connection>,
+    timeout_manager: TimeoutManager,
 }
 
 impl EventLoop {
@@ -36,6 +38,7 @@ impl EventLoop {
             #[cfg(target_os = "linux")]
             epoll_fd: event_fd,
             connections: HashMap::new(),
+            timeout_manager: TimeoutManager::new(TimeoutConfig::default()),
         })
     }
     
@@ -120,10 +123,14 @@ impl EventLoop {
         let mut events: [libc::kevent; MAX_EVENTS] = unsafe { std::mem::zeroed() };
         
         loop {
-            // Wait for events
+            // Check for timed-out connections first
+            self.handle_timeouts();
+            
+            // Calculate timeout based on next timeout check
+            let timeout_duration = self.timeout_manager.next_timeout_check();
             let timeout = libc::timespec {
-                tv_sec: TIMEOUT_MS as libc::time_t / 1000,
-                tv_nsec: (TIMEOUT_MS as libc::c_long % 1000) * 1_000_000,
+                tv_sec: timeout_duration.as_secs() as libc::time_t,
+                tv_nsec: (timeout_duration.subsec_nanos()) as libc::c_long,
             };
             
             let nfds = unsafe {
@@ -164,13 +171,20 @@ impl EventLoop {
         let mut events: [libc::epoll_event; MAX_EVENTS] = unsafe { std::mem::zeroed() };
         
         loop {
+            // Check for timed-out connections first
+            self.handle_timeouts();
+            
+            // Calculate timeout based on next timeout check
+            let timeout_duration = self.timeout_manager.next_timeout_check();
+            let timeout_ms = timeout_duration.as_millis().min(i32::MAX as u128) as c_int;
+            
             // Wait for events
             let nfds = unsafe {
                 libc::epoll_wait(
                     self.epoll_fd,
                     events.as_mut_ptr(),
                     MAX_EVENTS as c_int,
-                    TIMEOUT_MS,
+                    timeout_ms,
                 )
             };
             
@@ -216,6 +230,10 @@ impl EventLoop {
                     
                     // Add to event system
                     self.add_connection_to_events(fd)?;
+                    
+                    // Add to timeout manager
+                    self.timeout_manager.add_connection(fd);
+                    
                     self.connections.insert(fd, conn);
                 }
                 Err(e) if e.kind() == ErrorKind::WouldBlock => {
@@ -283,10 +301,23 @@ impl EventLoop {
     
     #[cfg(target_os = "macos")]
     fn handle_kqueue_connection_event(&mut self, fd: RawFd, filter: i16) -> io::Result<()> {
+        // Update activity timestamp
+        self.timeout_manager.update_activity(fd);
+        
         let should_close = if let Some(conn) = self.connections.get_mut(&fd) {
             if filter == libc::EVFILT_READ {
+                // Set reading state based on current parser state
+                let state = if conn.is_reading_body() {
+                    ConnectionState::ReadingBody
+                } else {
+                    ConnectionState::ReadingHeaders
+                };
+                self.timeout_manager.set_connection_state(fd, state);
+                
                 match conn.handle_read() {
                     Ok(true) => {
+                        // Ready to write response
+                        self.timeout_manager.set_connection_state(fd, ConnectionState::Writing);
                         conn.send_response()?;
                         self.enable_write_events_kqueue(fd)?;
                         false
@@ -295,8 +326,18 @@ impl EventLoop {
                     Err(_) => true,
                 }
             } else if filter == libc::EVFILT_WRITE {
+                self.timeout_manager.set_connection_state(fd, ConnectionState::Writing);
+                
                 match conn.handle_write() {
-                    Ok(true) => true,
+                    Ok(keep_alive) => {
+                        if keep_alive {
+                            // Reset for next request on keep-alive connection
+                            self.timeout_manager.reset_connection_for_new_request(fd);
+                            false
+                        } else {
+                            true
+                        }
+                    }
                     Ok(false) => false,
                     Err(_) => true,
                 }
@@ -315,10 +356,23 @@ impl EventLoop {
     
     #[cfg(target_os = "linux")]
     fn handle_epoll_connection_event(&mut self, fd: RawFd, events: u32) -> io::Result<()> {
+        // Update activity timestamp
+        self.timeout_manager.update_activity(fd);
+        
         let should_close = if let Some(conn) = self.connections.get_mut(&fd) {
             if events & libc::EPOLLIN as u32 != 0 {
+                // Set reading state based on current parser state
+                let state = if conn.is_reading_body() {
+                    ConnectionState::ReadingBody
+                } else {
+                    ConnectionState::ReadingHeaders
+                };
+                self.timeout_manager.set_connection_state(fd, state);
+                
                 match conn.handle_read() {
                     Ok(true) => {
+                        // Ready to write response
+                        self.timeout_manager.set_connection_state(fd, ConnectionState::Writing);
                         conn.send_response()?;
                         self.enable_write_events_epoll(fd)?;
                         false
@@ -327,8 +381,18 @@ impl EventLoop {
                     Err(_) => true,
                 }
             } else if events & libc::EPOLLOUT as u32 != 0 {
+                self.timeout_manager.set_connection_state(fd, ConnectionState::Writing);
+                
                 match conn.handle_write() {
-                    Ok(true) => true,
+                    Ok(keep_alive) => {
+                        if keep_alive {
+                            // Reset for next request on keep-alive connection
+                            self.timeout_manager.reset_connection_for_new_request(fd);
+                            false
+                        } else {
+                            true
+                        }
+                    }
                     Ok(false) => false,
                     Err(_) => true,
                 }
@@ -389,12 +453,26 @@ impl EventLoop {
         Ok(())
     }
     
+    fn handle_timeouts(&mut self) {
+        let timed_out_fds = self.timeout_manager.check_timeouts();
+        
+        for fd in timed_out_fds {
+            println!("Connection {} timed out, closing", fd);
+            if let Err(e) = self.close_connection(fd) {
+                eprintln!("Error closing timed-out connection {}: {}", fd, e);
+            }
+        }
+    }
+    
     fn close_connection(&mut self, fd: RawFd) -> io::Result<()> {
         #[cfg(target_os = "macos")]
         self.remove_from_kqueue(fd);
         
         #[cfg(target_os = "linux")]
         self.remove_from_epoll(fd);
+        
+        // Remove from timeout manager
+        self.timeout_manager.remove_connection(fd);
         
         if let Some(conn) = self.connections.remove(&fd) {
             println!("Closed connection from: {}", conn.addr());

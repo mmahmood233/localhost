@@ -204,4 +204,9 @@ impl HttpParser {
         self.body_bytes_read = 0;
         self.expected_body_length = None;
     }
+    
+    /// Check if the parser is currently reading request body
+    pub fn is_reading_body(&self) -> bool {
+        matches!(self.state, ParseState::Body)
+    }
 }

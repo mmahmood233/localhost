@@ -196,6 +196,11 @@ impl Connection {
     }
     
     pub fn should_keep_alive(&self) -> bool {
-        self.keep_alive && self.current_request.is_none()
+        self.keep_alive
+    }
+    
+    /// Check if the connection is currently reading request body
+    pub fn is_reading_body(&self) -> bool {
+        self.parser.is_reading_body()
     }
 }
