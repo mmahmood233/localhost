@@ -15,7 +15,10 @@ use server::Server;
 
 fn main() {
     println!("Starting Localhost HTTP Server...");
+    println!("Server will listen on http://127.0.0.1:8080");
+    println!("Press Ctrl+C to stop the server");
     
+    // For now, let's use the original simple server that actually works
     let mut server = match Server::new() {
         Ok(s) => s,
         Err(e) => {

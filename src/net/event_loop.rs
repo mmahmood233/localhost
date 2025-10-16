@@ -317,13 +317,34 @@ impl EventLoop {
                 match conn.handle_read() {
                     Ok(true) => {
                         // Ready to write response
+                        println!("Request parsed, generating response...");
                         self.timeout_manager.set_connection_state(fd, ConnectionState::Writing);
-                        conn.send_response()?;
-                        self.enable_write_events_kqueue(fd)?;
-                        false
+                        
+                        match conn.send_response() {
+                            Ok(()) => {
+                                println!("Response generated successfully, enabling write events...");
+                                match self.enable_write_events_kqueue(fd) {
+                                    Ok(()) => {
+                                        println!("Write events enabled successfully");
+                                        false
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Failed to enable write events: {}", e);
+                                        true
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to generate response: {}", e);
+                                true
+                            }
+                        }
                     }
                     Ok(false) => false,
-                    Err(_) => true,
+                    Err(e) => {
+                        eprintln!("Error in handle_read: {}", e);
+                        true
+                    }
                 }
             } else if filter == libc::EVFILT_WRITE {
                 self.timeout_manager.set_connection_state(fd, ConnectionState::Writing);
