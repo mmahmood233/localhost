@@ -5,6 +5,10 @@ mod config;
 mod errors;
 mod mime;
 mod fs;
+mod routing;
+mod upload;
+mod session;
+mod cgi;
 
 use std::process;
 use server::Server;

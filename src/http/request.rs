@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::str;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Method {
     GET,
     POST,
@@ -58,15 +58,8 @@ impl HttpRequest {
         }
     }
     
-    pub fn get_header(&self, name: &str) -> Option<&String> {
-        // Case-insensitive header lookup
-        let name_lower = name.to_lowercase();
-        for (key, value) in &self.headers {
-            if key.to_lowercase() == name_lower {
-                return Some(value);
-            }
-        }
-        None
+    pub fn get_header(&self, name: &str) -> Option<&str> {
+        self.headers.get(&name.to_lowercase()).map(|v| v.as_str())
     }
     
     pub fn content_length(&self) -> Option<usize> {
@@ -99,7 +92,26 @@ impl HttpRequest {
         }
     }
     
-    pub fn host(&self) -> Option<&String> {
+    pub fn host(&self) -> Option<&str> {
         self.get_header("host")
+    }
+    
+    /// Get the HTTP method
+    pub fn method(&self) -> &Method {
+        &self.method
+    }
+    
+    /// Get the request path
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+    
+    /// Get the request body
+    pub fn body(&self) -> Option<&[u8]> {
+        if self.body.is_empty() {
+            None
+        } else {
+            Some(&self.body)
+        }
     }
 }
