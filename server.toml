@@ -1,0 +1,256 @@
+# Localhost HTTP Server Configuration
+# TOML format configuration file
+
+[server]
+# Server name shown in response headers
+name = "Localhost"
+# Server version
+version = "1.0.0"
+
+# Global server settings
+[global]
+# Maximum request body size (in bytes)
+# 10MB = 10 * 1024 * 1024
+max_body_size = 10485760
+
+# Request timeout in seconds
+request_timeout = 30
+
+# Keep-alive timeout in seconds
+keep_alive_timeout = 10
+
+# Read header timeout in seconds
+read_header_timeout = 5
+
+# Read body timeout in seconds
+read_body_timeout = 15
+
+# Write timeout in seconds
+write_timeout = 5
+
+# Maximum number of concurrent connections
+max_connections = 1000
+
+# Enable directory listing
+directory_listing = true
+
+# Default index files (checked in order)
+index_files = ["index.html", "index.htm", "default.html"]
+
+# Logging settings
+[logging]
+# Enable access logging
+access_log = true
+# Access log file path
+access_log_path = "./logs/access.log"
+
+# Enable error logging
+error_log = true
+# Error log file path
+error_log_path = "./logs/error.log"
+
+# Log level: debug, info, warn, error
+log_level = "info"
+
+# Security settings
+[security]
+# Enable security headers
+enable_security_headers = true
+
+# X-Frame-Options header
+x_frame_options = "SAMEORIGIN"
+
+# X-Content-Type-Options header
+x_content_type_options = "nosniff"
+
+# X-XSS-Protection header
+x_xss_protection = "1; mode=block"
+
+# Strict-Transport-Security header (HSTS)
+# Only enable if using HTTPS
+# hsts = "max-age=31536000; includeSubDomains"
+
+# Content-Security-Policy header
+# csp = "default-src 'self'"
+
+# Session configuration
+[session]
+# Session cookie name
+cookie_name = "SESSIONID"
+
+# Session timeout in seconds (1 hour)
+timeout = 3600
+
+# Use secure cookies (only over HTTPS)
+secure_cookies = false
+
+# Use HTTP-only cookies (not accessible via JavaScript)
+http_only_cookies = true
+
+# Cleanup interval for expired sessions (in seconds)
+cleanup_interval = 300
+
+# Maximum number of sessions to store
+max_sessions = 10000
+
+# Upload configuration
+[upload]
+# Upload directory (relative to document root)
+upload_directory = "./uploads"
+
+# Maximum file size for uploads (in bytes)
+# 10MB = 10 * 1024 * 1024
+max_file_size = 10485760
+
+# Allowed file extensions (empty = allow all)
+allowed_extensions = ["txt", "pdf", "jpg", "jpeg", "png", "gif", "zip", "doc", "docx"]
+
+# Enable file upload
+enabled = true
+
+# CGI configuration
+[cgi]
+# Enable CGI execution
+enabled = true
+
+# CGI script directory
+cgi_directory = "./www/cgi-bin"
+
+# CGI execution timeout (in seconds)
+timeout = 30
+
+# Maximum CGI output size (in bytes)
+max_output_size = 1048576
+
+# CGI interpreters by file extension
+[cgi.interpreters]
+py = "/usr/bin/env python3"
+pl = "/usr/bin/env perl"
+sh = "/bin/bash"
+rb = "/usr/bin/env ruby"
+php = "/usr/bin/env php"
+
+# Listener configurations
+[[listener]]
+# Bind address
+address = "127.0.0.1"
+# Port number
+port = 8080
+# Mark as default listener
+default = true
+
+# Virtual host configuration for localhost
+[[vhost]]
+# Server name (Host header value)
+server_name = "localhost"
+# Document root directory
+document_root = "./www"
+# Default listener
+default = true
+
+# Error pages for this virtual host
+[vhost.error_pages]
+400 = "./www/error_pages/400.html"
+403 = "./www/error_pages/403.html"
+404 = "./www/error_pages/404.html"
+405 = "./www/error_pages/405.html"
+413 = "./www/error_pages/413.html"
+500 = "./www/error_pages/500.html"
+
+# Route: Root path (static files)
+[[vhost.route]]
+path = "/"
+methods = ["GET", "HEAD"]
+type = "static"
+directory_listing = true
+index_files = ["index.html", "index.htm"]
+
+# Route: Upload endpoint
+[[vhost.route]]
+path = "/upload"
+methods = ["GET", "POST"]
+type = "static"
+max_body_size = 10485760
+
+# Route: Uploads directory
+[[vhost.route]]
+path = "/uploads/*"
+methods = ["GET", "DELETE"]
+type = "static"
+
+# Route: CGI scripts
+[[vhost.route]]
+path = "/cgi-bin/*"
+methods = ["GET", "POST"]
+type = "cgi"
+
+# Route: Session endpoints
+[[vhost.route]]
+path = "/session/*"
+methods = ["GET", "POST", "DELETE"]
+type = "static"
+
+# Redirect rules
+[[vhost.redirect]]
+# Redirect /old-page to /new-page with 301 (permanent)
+from = "/old-page"
+to = "/new-page"
+type = "permanent"
+
+[[vhost.redirect]]
+# Redirect /redirect/301/* to /
+from = "/redirect/301/*"
+to = "/"
+type = "permanent"
+
+[[vhost.redirect]]
+# Redirect /redirect/302/* to /
+from = "/redirect/302/*"
+to = "/"
+type = "temporary"
+
+[[vhost.redirect]]
+# Redirect /redirect/307/* to /
+from = "/redirect/307/*"
+to = "/"
+type = "temporary_preserve"
+
+[[vhost.redirect]]
+# Redirect /redirect/308/* to /
+from = "/redirect/308/*"
+to = "/"
+type = "permanent_preserve"
+
+# CORS settings for API routes
+[vhost.cors]
+enabled = true
+allowed_origins = ["*"]
+allowed_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+allowed_headers = ["Content-Type", "Authorization"]
+allow_credentials = false
+max_age = 3600
+
+# Cache settings
+[vhost.cache]
+# Enable caching
+enabled = true
+# Cache control for static files
+static_max_age = 3600
+# Cache control for dynamic content
+dynamic_max_age = 0
+
+# Additional virtual host example (commented out)
+# [[listener]]
+# address = "127.0.0.1"
+# port = 8081
+# default = false
+#
+# [[vhost]]
+# server_name = "example.local"
+# document_root = "./www-example"
+# default = false
+#
+# [[vhost.route]]
+# path = "/"
+# methods = ["GET", "HEAD"]
+# type = "static"

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirect Tests - Localhost HTTP Server</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            color: #fa709a;
+            margin-bottom: 10px;
+            font-size: 36px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-left: 5px solid #fa709a;
+        }
+        .test-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 22px;
+        }
+        .test-section p {
+            color: #666;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        .test-section code {
+            background: #e9ecef;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #d63384;
+        }
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            margin: 5px;
+        }
+        .btn-redirect {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white;
+        }
+        .btn-redirect:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(250, 112, 154, 0.4);
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .nav-buttons {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e9ecef;
+        }
+        .info-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .info-box strong {
+            color: #856404;
+        }
+        .redirect-types {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .redirect-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            text-align: center;
+        }
+        .redirect-card h3 {
+            color: #fa709a;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .redirect-card p {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔀 HTTP Redirect Tests</h1>
+        <p class="subtitle">Test different types of HTTP redirects and their behaviors</p>
+
+        <div class="info-box">
+            <strong>ℹ️ About Redirects:</strong> HTTP redirects are responses that tell the browser to navigate to a different URL. Different status codes have different meanings and behaviors.
+        </div>
+
+        <!-- 301 Permanent Redirect -->
+        <div class="test-section">
+            <h2>301 - Permanent Redirect</h2>
+            <p>
+                Indicates that the resource has permanently moved to a new location. 
+                Browsers will cache this redirect and automatically use the new URL in future requests.
+            </p>
+            <p><strong>Use case:</strong> Website migration, URL structure changes</p>
+            <a href="/redirect/301/home" class="btn btn-redirect">Test 301 Redirect</a>
+            <code>GET /redirect/301/home → 301 → /</code>
+        </div>
+
+        <!-- 302 Temporary Redirect -->
+        <div class="test-section">
+            <h2>302 - Temporary Redirect (Found)</h2>
+            <p>
+                Indicates that the resource is temporarily at a different location. 
+                Browsers won't cache this redirect and will check the original URL next time.
+            </p>
+            <p><strong>Use case:</strong> Temporary maintenance, A/B testing</p>
+            <a href="/redirect/302/home" class="btn btn-redirect">Test 302 Redirect</a>
+            <code>GET /redirect/302/home → 302 → /</code>
+        </div>
+
+        <!-- 303 See Other -->
+        <div class="test-section">
+            <h2>303 - See Other</h2>
+            <p>
+                Used after POST requests to redirect to a GET request. 
+                Prevents form resubmission when refreshing the page.
+            </p>
+            <p><strong>Use case:</strong> Post-Redirect-Get pattern, form submissions</p>
+            <button onclick="testPost303()" class="btn btn-redirect">Test 303 Redirect (POST)</button>
+            <code>POST /redirect/303 → 303 → /upload.html</code>
+        </div>
+
+        <!-- 307 Temporary Redirect (Preserve Method) -->
+        <div class="test-section">
+            <h2>307 - Temporary Redirect (Preserve Method)</h2>
+            <p>
+                Similar to 302 but guarantees that the HTTP method won't change. 
+                If you POST to the original URL, the redirect will also be a POST.
+            </p>
+            <p><strong>Use case:</strong> Temporary redirects that must preserve the request method</p>
+            <a href="/redirect/307/home" class="btn btn-redirect">Test 307 Redirect</a>
+            <code>GET /redirect/307/home → 307 → /</code>
+        </div>
+
+        <!-- 308 Permanent Redirect (Preserve Method) -->
+        <div class="test-section">
+            <h2>308 - Permanent Redirect (Preserve Method)</h2>
+            <p>
+                Similar to 301 but guarantees that the HTTP method won't change. 
+                The permanent version of 307.
+            </p>
+            <p><strong>Use case:</strong> Permanent redirects that must preserve the request method</p>
+            <a href="/redirect/308/home" class="btn btn-redirect">Test 308 Redirect</a>
+            <code>GET /redirect/308/home → 308 → /</code>
+        </div>
+
+        <!-- Redirect Types Summary -->
+        <div class="test-section">
+            <h2>📊 Redirect Types Summary</h2>
+            <div class="redirect-types">
+                <div class="redirect-card">
+                    <h3>301</h3>
+                    <p>Permanent</p>
+                    <p>May change method</p>
+                    <p>Cached</p>
+                </div>
+                <div class="redirect-card">
+                    <h3>302</h3>
+                    <p>Temporary</p>
+                    <p>May change method</p>
+                    <p>Not cached</p>
+                </div>
+                <div class="redirect-card">
+                    <h3>303</h3>
+                    <p>See Other</p>
+                    <p>Changes to GET</p>
+                    <p>Not cached</p>
+                </div>
+                <div class="redirect-card">
+                    <h3>307</h3>
+                    <p>Temporary</p>
+                    <p>Preserves method</p>
+                    <p>Not cached</p>
+                </div>
+                <div class="redirect-card">
+                    <h3>308</h3>
+                    <p>Permanent</p>
+                    <p>Preserves method</p>
+                    <p>Cached</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cookie Test -->
+        <div class="test-section">
+            <h2>🍪 Cookie & Redirect Test</h2>
+            <p>Test setting cookies during redirect responses.</p>
+            <button onclick="testCookieRedirect()" class="btn btn-redirect">Set Cookie & Redirect</button>
+            <button onclick="showCookies()" class="btn btn-secondary">Show Cookies</button>
+            <div id="cookieDisplay" style="margin-top: 15px; padding: 10px; background: #e9ecef; border-radius: 5px; display: none;"></div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="nav-buttons">
+            <a href="/" class="btn btn-secondary">← Back to Home</a>
+            <a href="/upload.html" class="btn btn-secondary">File Upload</a>
+            <a href="/cgi-bin/test.py" class="btn btn-secondary">Test CGI</a>
+        </div>
+    </div>
+
+    <script>
+        // Test POST with 303 redirect
+        async function testPost303() {
+            try {
+                const response = await fetch('/redirect/303', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: 'test=data'
+                });
+                
+                if (response.redirected) {
+                    window.location.href = response.url;
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Test cookie redirect
+        async function testCookieRedirect() {
+            try {
+                const response = await fetch('/redirect/cookie', {
+                    credentials: 'include'
+                });
+                
+                if (response.redirected) {
+                    alert('Cookie set! Redirecting...');
+                    window.location.href = response.url;
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Show current cookies
+        function showCookies() {
+            const cookieDisplay = document.getElementById('cookieDisplay');
+            const cookies = document.cookie;
+            
+            if (cookies) {
+                cookieDisplay.innerHTML = '<strong>Current Cookies:</strong><br>' + 
+                    cookies.split(';').map(c => c.trim()).join('<br>');
+            } else {
+                cookieDisplay.innerHTML = '<strong>No cookies set</strong>';
+            }
+            
+            cookieDisplay.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 pub mod router;
-mod route;
+pub mod route;
 mod handler;
 mod redirections;
 

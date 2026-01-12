@@ -1,0 +1,37 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo lock file (optional for binaries, include for libraries)
+# Cargo.lock
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files with hash-like names
+localhost-*
+*[0-9a-z]{12,}*
+
+# Log files
+*.log
+/tmp/
+*.tmp
+
+# Upload directory (if you want to ignore uploaded files)
+/uploads/*
+!/uploads/.gitkeep
+
+# Session data (if persisted)
+/sessions/
+
+# Test artifacts
+/test_results/

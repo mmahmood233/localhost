@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload - Localhost HTTP Server</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 36px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .upload-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 2px dashed #667eea;
+        }
+        .upload-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+        .file-input-label {
+            display: block;
+            padding: 20px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .file-input-label:hover {
+            background: #667eea;
+            color: white;
+        }
+        .file-input-label .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .selected-file {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .selected-file.show {
+            display: block;
+        }
+        .btn {
+            padding: 15px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            color: white;
+        }
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255, 107, 107, 0.4);
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .files-list {
+            margin-top: 30px;
+        }
+        .files-list h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .file-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-info {
+            flex: 1;
+        }
+        .file-name {
+            font-weight: 600;
+            color: #333;
+        }
+        .file-size {
+            color: #666;
+            font-size: 14px;
+        }
+        .status-message {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .status-message.show {
+            display: block;
+        }
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .nav-buttons {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e9ecef;
+        }
+        .nav-buttons a {
+            margin-right: 10px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+        .form-group input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        .form-group input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📤 File Upload</h1>
+        <p class="subtitle">Upload, manage, and delete files on the server</p>
+
+        <div id="statusMessage" class="status-message"></div>
+
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <h2>Upload New File</h2>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileInput" name="file" multiple>
+                    <label for="fileInput" class="file-input-label">
+                        <div class="icon">📁</div>
+                        <div>Click to select files or drag and drop</div>
+                        <div style="font-size: 14px; color: #666; margin-top: 10px;">Maximum file size: 10MB</div>
+                    </label>
+                </div>
+                
+                <div id="selectedFiles" class="selected-file"></div>
+
+                <div class="form-group">
+                    <label for="description">Description (optional):</label>
+                    <input type="text" id="description" name="description" placeholder="Enter file description">
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
+                    Upload Files
+                </button>
+            </form>
+        </div>
+
+        <!-- Uploaded Files List -->
+        <div class="files-list">
+            <h2>📋 Uploaded Files</h2>
+            <div id="filesList">
+                <p style="color: #666;">No files uploaded yet. Upload your first file above!</p>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="nav-buttons">
+            <a href="/" class="btn btn-secondary">← Back to Home</a>
+            <a href="/redirect-test.html" class="btn btn-secondary">Test Redirects</a>
+            <a href="/cgi-bin/test.py" class="btn btn-secondary">Test CGI</a>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const selectedFiles = document.getElementById('selectedFiles');
+        const statusMessage = document.getElementById('statusMessage');
+        const filesList = document.getElementById('filesList');
+
+        // Handle file selection
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                uploadBtn.disabled = false;
+                let html = '<div class="show"><strong>Selected files:</strong><br>';
+                for (let i = 0; i < this.files.length; i++) {
+                    const file = this.files[i];
+                    const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                    html += `${i + 1}. ${file.name} (${sizeMB} MB)<br>`;
+                }
+                html += '</div>';
+                selectedFiles.innerHTML = html;
+                selectedFiles.classList.add('show');
+            } else {
+                uploadBtn.disabled = true;
+                selectedFiles.classList.remove('show');
+            }
+        });
+
+        // Handle form submission
+        uploadForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            
+            showStatus('Uploading...', 'info');
+            uploadBtn.disabled = true;
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    showStatus('✓ Files uploaded successfully!', 'success');
+                    uploadForm.reset();
+                    selectedFiles.classList.remove('show');
+                    loadFilesList();
+                } else {
+                    showStatus('✗ Upload failed: ' + response.statusText, 'error');
+                }
+            } catch (error) {
+                showStatus('✗ Upload error: ' + error.message, 'error');
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        });
+
+        // Show status message
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = 'status-message show status-' + type;
+            setTimeout(() => {
+                statusMessage.classList.remove('show');
+            }, 5000);
+        }
+
+        // Load uploaded files list
+        async function loadFilesList() {
+            try {
+                const response = await fetch('/uploads');
+                if (response.ok) {
+                    const files = await response.json();
+                    displayFiles(files);
+                }
+            } catch (error) {
+                console.error('Error loading files:', error);
+            }
+        }
+
+        // Display files
+        function displayFiles(files) {
+            if (!files || files.length === 0) {
+                filesList.innerHTML = '<p style="color: #666;">No files uploaded yet.</p>';
+                return;
+            }
+
+            let html = '';
+            files.forEach(file => {
+                html += `
+                    <div class="file-item">
+                        <div class="file-info">
+                            <div class="file-name">📄 ${file.name}</div>
+                            <div class="file-size">${file.size}</div>
+                        </div>
+                        <button class="btn btn-danger" onclick="deleteFile('${file.name}')">Delete</button>
+                    </div>
+                `;
+            });
+            filesList.innerHTML = html;
+        }
+
+        // Delete file
+        async function deleteFile(filename) {
+            if (!confirm('Are you sure you want to delete ' + filename + '?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/uploads/' + filename, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showStatus('✓ File deleted successfully!', 'success');
+                    loadFilesList();
+                } else {
+                    showStatus('✗ Delete failed: ' + response.statusText, 'error');
+                }
+            } catch (error) {
+                showStatus('✗ Delete error: ' + error.message, 'error');
+            }
+        }
+
+        // Load files on page load
+        loadFilesList();
+    </script>
+</body>
+</html>

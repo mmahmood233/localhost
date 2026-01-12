@@ -78,6 +78,48 @@ ul {
     text-decoration: underline;
 }
 
+/* Test cards grid */
+.test-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.test-card {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    text-decoration: none;
+    color: #333;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.test-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    border-color: #667eea;
+}
+
+.test-icon {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+}
+
+.test-card h3 {
+    color: #667eea;
+    margin-bottom: 0.5rem;
+    font-size: 1.2rem;
+}
+
+.test-card p {
+    color: #666;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
 footer {
     text-align: center;
     padding: 2rem;

@@ -5,6 +5,8 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use libc::{self, c_int};
 use crate::net::conn::Connection;
 use crate::net::timeout::{TimeoutManager, TimeoutConfig, ConnectionState};
+use crate::config::server::VirtualHostConfig;
+use crate::session::{SessionStore, SessionConfig};
 
 const MAX_EVENTS: usize = 1024;
 const TIMEOUT_MS: c_int = 1000;
@@ -17,10 +19,20 @@ pub struct EventLoop {
     epoll_fd: RawFd,
     connections: HashMap<RawFd, Connection>,
     timeout_manager: TimeoutManager,
+    vhost_config: Option<VirtualHostConfig>,
+    session_store: SessionStore,
 }
 
 impl EventLoop {
     pub fn new(addr: &str) -> io::Result<Self> {
+        Self::new_with_config(addr, None, None)
+    }
+    
+    pub fn new_with_config(
+        addr: &str,
+        vhost_config: Option<VirtualHostConfig>,
+        session_store: Option<SessionStore>,
+    ) -> io::Result<Self> {
         // Create and bind listener socket
         let listener = TcpListener::bind(addr)?;
         listener.set_nonblocking(true)?;
@@ -31,6 +43,10 @@ impl EventLoop {
         #[cfg(target_os = "linux")]
         let event_fd = Self::create_epoll(&listener)?;
         
+        let session_store = session_store.unwrap_or_else(|| {
+            SessionStore::new(SessionConfig::default())
+        });
+        
         Ok(EventLoop {
             listener,
             #[cfg(target_os = "macos")]
@@ -39,6 +55,8 @@ impl EventLoop {
             epoll_fd: event_fd,
             connections: HashMap::new(),
             timeout_manager: TimeoutManager::new(TimeoutConfig::default()),
+            vhost_config,
+            session_store,
         })
     }
     
@@ -220,7 +238,12 @@ impl EventLoop {
                     stream.set_nonblocking(true)?;
                     
                     let fd = stream.as_raw_fd();
-                    let conn = match Connection::new(stream, addr) {
+                    let conn = match Connection::new_with_config(
+                        stream,
+                        addr,
+                        self.vhost_config.clone(),
+                        Some(self.session_store.clone()),
+                    ) {
                         Ok(c) => c,
                         Err(e) => {
                             eprintln!("Failed to create connection: {}", e);
