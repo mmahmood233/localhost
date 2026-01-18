@@ -5,7 +5,7 @@ use crate::http::response::HttpResponse;
 use crate::upload::multipart::{MultipartParser, FieldType};
 use crate::upload::form_data::FormData;
 use crate::upload::file_storage::{FileStorage, StorageConfig};
-use crate::session::{SessionStore, SessionConfig, CookieJar, Cookie};
+use crate::session::{SessionStore, SessionConfig, CookieJar};
 use crate::cgi::{CgiExecutor, CgiConfig};
 use std::collections::HashMap;
 use std::io;

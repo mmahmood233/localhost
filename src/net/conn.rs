@@ -58,30 +58,82 @@ impl Connection {
         } else {
             // Add default virtual host with default route allowing all methods
             use std::collections::HashSet;
-            let mut allowed_methods = HashSet::new();
-            allowed_methods.insert(Method::GET);
-            allowed_methods.insert(Method::POST);
-            allowed_methods.insert(Method::DELETE);
-            allowed_methods.insert(Method::HEAD);
             
-            let default_route = RouteConfig {
+            // Route 1: Root - GET/HEAD only
+            let mut root_methods = HashSet::new();
+            root_methods.insert(Method::GET);
+            root_methods.insert(Method::HEAD);
+            
+            let root_route = RouteConfig {
                 path: "/".to_string(),
-                allowed_methods,
+                allowed_methods: root_methods,
                 document_root: None,
                 index_file: Some("index.html".to_string()),
                 directory_listing: false,
                 redirect: None,
                 cgi_extension: None,
-                max_body_size: Some(10 * 1024 * 1024), // 10MB
+                max_body_size: Some(10 * 1024 * 1024),
+                error_pages: HashMap::new(),
+            };
+            
+            // Route 2: Uploads - GET/DELETE
+            let mut upload_methods = HashSet::new();
+            upload_methods.insert(Method::GET);
+            upload_methods.insert(Method::DELETE);
+            
+            let uploads_route = RouteConfig {
+                path: "/uploads/*".to_string(),
+                allowed_methods: upload_methods,
+                document_root: None,
+                index_file: None,
+                directory_listing: false,
+                redirect: None,
+                cgi_extension: None,
+                max_body_size: Some(10 * 1024 * 1024),
+                error_pages: HashMap::new(),
+            };
+            
+            // Route 3: Upload endpoint - POST
+            let mut upload_post_methods = HashSet::new();
+            upload_post_methods.insert(Method::POST);
+            upload_post_methods.insert(Method::GET);
+            
+            let upload_endpoint_route = RouteConfig {
+                path: "/upload".to_string(),
+                allowed_methods: upload_post_methods,
+                document_root: None,
+                index_file: None,
+                directory_listing: false,
+                redirect: None,
+                cgi_extension: None,
+                max_body_size: Some(10 * 1024 * 1024),
+                error_pages: HashMap::new(),
+            };
+            
+            // Route 4: Session endpoints - GET/POST/DELETE
+            let mut session_methods = HashSet::new();
+            session_methods.insert(Method::GET);
+            session_methods.insert(Method::POST);
+            session_methods.insert(Method::DELETE);
+            
+            let session_route = RouteConfig {
+                path: "/session/*".to_string(),
+                allowed_methods: session_methods,
+                document_root: None,
+                index_file: None,
+                directory_listing: false,
+                redirect: None,
+                cgi_extension: None,
+                max_body_size: Some(10 * 1024 * 1024),
                 error_pages: HashMap::new(),
             };
             
             let default_vhost = VirtualHost {
                 server_name: "localhost".to_string(),
-                routes: vec![default_route],
+                routes: vec![uploads_route, upload_endpoint_route, session_route, root_route],
                 document_root: "./www".to_string(),
                 error_pages: HashMap::new(),
-                max_body_size: 10 * 1024 * 1024, // 10MB
+                max_body_size: 10 * 1024 * 1024,
             };
             router.add_virtual_host(default_vhost);
         }
@@ -265,7 +317,7 @@ impl Connection {
         };
         
         // Check for session and update activity
-        if let Some(mut session) = self.session_store.get_session_from_cookies(&cookies) {
+        if let Some(session) = self.session_store.get_session_from_cookies(&cookies) {
             // Update session activity
             let _ = self.session_store.update_session(session);
         }

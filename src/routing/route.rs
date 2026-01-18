@@ -64,15 +64,32 @@ impl Route {
     
     /// Check if this route matches the given path
     pub fn matches(&self, path: &str) -> bool {
+        let route_path = &self.config.path;
+        
         // Exact match
-        if self.config.path == path {
+        if route_path == path {
             return true;
         }
         
+        // Wildcard matching (route "/uploads/*" matches "/uploads/anything")
+        if route_path.ends_with("/*") {
+            let prefix = &route_path[..route_path.len() - 2]; // Remove "/*"
+            if prefix.is_empty() {
+                return true; // "/*" matches everything
+            }
+            // Check if path starts with prefix and has more content
+            if path.starts_with(prefix) {
+                if path.len() > prefix.len() {
+                    let next_char = path.chars().nth(prefix.len()).unwrap();
+                    return next_char == '/';
+                }
+            }
+            return false;
+        }
+        
         // Directory-based matching (route "/api" matches "/api/users")
-        if self.config.path != "/" && path.starts_with(&self.config.path) {
+        if route_path != "/" && path.starts_with(route_path) {
             // Ensure we match directory boundaries
-            let route_path = &self.config.path;
             if path.len() > route_path.len() {
                 let next_char = path.chars().nth(route_path.len()).unwrap();
                 return next_char == '/';
@@ -80,7 +97,7 @@ impl Route {
         }
         
         // Root route matches everything if no other route matches
-        self.config.path == "/"
+        route_path == "/"
     }
     
     /// Check if the given HTTP method is allowed for this route

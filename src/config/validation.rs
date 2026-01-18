@@ -1,7 +1,6 @@
 use crate::config::server::*;
 use std::collections::HashSet;
 use std::fmt;
-use std::io;
 use std::path::Path;
 
 /// Configuration validation error

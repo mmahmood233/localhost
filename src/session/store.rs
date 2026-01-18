@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 use std::io;
 
-use super::session::{Session, SessionData};
+use super::session::Session;
 use super::cookie::{Cookie, CookieJar};
 
 /// Configuration for session store

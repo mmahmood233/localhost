@@ -1,9 +1,8 @@
 use crate::cgi::environment::CgiEnvironment;
-use crate::cgi::response::{CgiResponse, CgiResponseParser};
+use crate::cgi::response::CgiResponseParser;
 use crate::http::request::HttpRequest;
 use crate::http::response::HttpResponse;
 use std::collections::HashMap;
-use std::ffi::CString;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};

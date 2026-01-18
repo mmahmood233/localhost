@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use std::io::{self, Write};
-use std::path::PathBuf;
+use std::io::{self};
 
 /// Type of multipart field
 #[derive(Debug, Clone)]
