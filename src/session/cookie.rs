@@ -216,14 +216,49 @@ impl Default for CookieJar {
 /// Format Unix timestamp as HTTP date
 fn format_http_date(timestamp: u64) -> String {
     // Simple HTTP date formatting (RFC 7231)
-    // In a real implementation, you'd use a proper date formatting library
-    let days = timestamp / 86400;
+    const DAYS_IN_MONTH: [u64; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const MONTH_NAMES: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const DAY_NAMES: [&str; 7] = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
+    
+    let mut days_since_epoch = timestamp / 86400;
     let hours = (timestamp % 86400) / 3600;
     let minutes = (timestamp % 3600) / 60;
     let seconds = timestamp % 60;
     
-    // This is a simplified format - in production use proper RFC 7231 formatting
-    format!("Thu, 01 Jan 1970 {:02}:{:02}:{:02} GMT", hours, minutes, seconds)
+    // Calculate year
+    let mut year = 1970;
+    loop {
+        let days_in_year = if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) { 366 } else { 365 };
+        if days_since_epoch >= days_in_year {
+            days_since_epoch -= days_in_year;
+            year += 1;
+        } else {
+            break;
+        }
+    }
+    
+    // Calculate month and day
+    let mut month = 0;
+    let is_leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    for i in 0..12 {
+        let mut days_in_month = DAYS_IN_MONTH[i];
+        if i == 1 && is_leap {
+            days_in_month = 29;
+        }
+        if days_since_epoch >= days_in_month {
+            days_since_epoch -= days_in_month;
+            month += 1;
+        } else {
+            break;
+        }
+    }
+    let day = days_since_epoch + 1;
+    
+    // Calculate day of week (simplified)
+    let day_of_week = ((timestamp / 86400 + 4) % 7) as usize;
+    
+    format!("{}, {:02} {} {} {:02}:{:02}:{:02} GMT", 
+            DAY_NAMES[day_of_week], day, MONTH_NAMES[month], year, hours, minutes, seconds)
 }
 
 #[cfg(test)]

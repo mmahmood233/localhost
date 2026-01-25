@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+#[derive(Debug, Clone)]
 pub struct MimeTypes {
     types: HashMap<String, &'static str>,
 }

@@ -133,7 +133,7 @@ impl HttpParser {
                     .map_err(|_| io::Error::new(ErrorKind::InvalidData, "Invalid UTF-8 in header"))?;
                 
                 if let Some(colon_pos) = line.find(':') {
-                    let name = line[..colon_pos].trim().to_string();
+                    let name = line[..colon_pos].trim().to_lowercase();
                     let value = line[colon_pos + 1..].trim().to_string();
                     
                     if name.is_empty() {

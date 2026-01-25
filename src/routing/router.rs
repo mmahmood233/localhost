@@ -7,6 +7,7 @@ use crate::upload::form_data::FormData;
 use crate::upload::file_storage::{FileStorage, StorageConfig};
 use crate::session::{SessionStore, SessionConfig, CookieJar};
 use crate::cgi::{CgiExecutor, CgiConfig};
+use crate::mime::MimeTypes;
 use std::collections::HashMap;
 use std::io;
 use std::path::Path;
@@ -51,6 +52,8 @@ pub struct Router {
     session_store: SessionStore,
     /// CGI executor for dynamic content
     cgi_executor: CgiExecutor,
+    /// MIME type resolver
+    mime_types: MimeTypes,
 }
 
 impl Router {
@@ -65,13 +68,21 @@ impl Router {
         let cgi_config = CgiConfig::default();
         let cgi_executor = CgiExecutor::new(cgi_config);
         
+        let mime_types = MimeTypes::new();
+        
         Router {
             virtual_hosts: HashMap::new(),
             default_host: None,
             file_storage,
             session_store,
             cgi_executor,
+            mime_types,
         }
+    }
+    
+    /// Get MIME type for a file path
+    fn get_mime_type(&self, path: &Path) -> &'static str {
+        self.mime_types.get_mime_type(path)
     }
     
     /// Add a virtual host configuration
@@ -225,7 +236,14 @@ impl Router {
     /// Handle GET and HEAD requests (static files, directory listing, CGI)
     fn handle_get_request(&mut self, request: &HttpRequest, route: &Route, vhost: &VirtualHost) -> io::Result<HttpResponse> {
         let path = request.path();
-        let file_path = Path::new(&vhost.document_root).join(path.trim_start_matches('/'));
+        
+        // Special handling for /uploads/* paths - serve from uploads directory
+        let file_path = if path.starts_with("/uploads/") {
+            let filename = path.trim_start_matches("/uploads/");
+            self.file_storage.config().upload_dir.join(filename)
+        } else {
+            Path::new(&vhost.document_root).join(path.trim_start_matches('/'))
+        };
         
         // Check if this is a CGI script
         if self.cgi_executor.is_cgi_script(&file_path) {
@@ -234,11 +252,16 @@ impl Router {
         
         // Check if file exists for static serving
         if file_path.exists() && file_path.is_file() {
-            // For now, return a simple static file response
-            // This will be integrated with the existing StaticFileServer
+            // Read file content
+            use std::fs;
+            let content = fs::read(&file_path)?;
+            
+            // Determine MIME type
+            let mime_type = self.get_mime_type(&file_path);
+            
             let mut response = HttpResponse::ok();
-            response.set_body(b"Static file serving - integrated with existing system");
-            response.set_header("Content-Type", "text/plain");
+            response.set_body(&content);
+            response.set_header("Content-Type", mime_type);
             return Ok(response);
         }
         
@@ -257,10 +280,12 @@ impl Router {
             }
         }
         
-        // Check if this is a CGI request
-        if let Some(_cgi_ext) = route.cgi_extension() {
-            // TODO: Implement CGI handling
-            return self.generate_error_response(500, route, vhost);
+        // Check if this is a CGI script
+        let path = request.path();
+        let file_path = Path::new(&vhost.document_root).join(path.trim_start_matches('/'));
+        
+        if self.cgi_executor.is_cgi_script(&file_path) {
+            return self.execute_cgi_script(request, &file_path, route, vhost);
         }
         
         // Get request body
@@ -481,6 +506,9 @@ impl Router {
         
         // Handle session info endpoint
         if path == "/session/info" {
+            println!("DEBUG: Session info requested");
+            println!("DEBUG: Cookies in jar: {:?}", cookies.cookies());
+            
             if let Some(session) = self.session_store.get_session_from_cookies(cookies) {
                 let response_body = format!(
                     "Session ID: {}\nCreated: {:?}\nLast Accessed: {:?}\nData: {} items",
@@ -491,6 +519,7 @@ impl Router {
                 );
                 response.set_body(response_body.as_bytes());
             } else {
+                println!("DEBUG: No session found in cookies");
                 response.set_body(b"No active session");
             }
             response.set_header("Content-Type", "text/plain");

@@ -128,9 +128,26 @@ impl Connection {
                 error_pages: HashMap::new(),
             };
             
+            // Route 5: CGI scripts - GET/POST
+            let mut cgi_methods = HashSet::new();
+            cgi_methods.insert(Method::GET);
+            cgi_methods.insert(Method::POST);
+            
+            let cgi_route = RouteConfig {
+                path: "/cgi-bin/*".to_string(),
+                allowed_methods: cgi_methods,
+                document_root: None,
+                index_file: None,
+                directory_listing: false,
+                redirect: None,
+                cgi_extension: Some("py".to_string()), // Will match .py, .pl, .sh, etc.
+                max_body_size: Some(10 * 1024 * 1024),
+                error_pages: HashMap::new(),
+            };
+            
             let default_vhost = VirtualHost {
                 server_name: "localhost".to_string(),
-                routes: vec![uploads_route, upload_endpoint_route, session_route, root_route],
+                routes: vec![uploads_route, upload_endpoint_route, session_route, cgi_route, root_route],
                 document_root: "./www".to_string(),
                 error_pages: HashMap::new(),
                 max_body_size: 10 * 1024 * 1024,
@@ -351,6 +368,11 @@ impl Connection {
         
         // Check if this is a session endpoint
         if path.starts_with("/session/") {
+            return self.router.route_request(request);
+        }
+        
+        // Check if this is an uploads endpoint - route through router
+        if path.starts_with("/uploads/") {
             return self.router.route_request(request);
         }
         

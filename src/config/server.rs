@@ -364,11 +364,9 @@ impl Default for CgiConfig {
         interpreters.insert("py".to_string(), "python3".to_string());
         interpreters.insert("pl".to_string(), "perl".to_string());
         interpreters.insert("sh".to_string(), "sh".to_string());
-        interpreters.insert("rb".to_string(), "ruby".to_string());
-        interpreters.insert("php".to_string(), "php".to_string());
         
         CgiConfig {
-            enabled: true,
+            enabled: false, // Disabled by default to avoid validation errors
             directory: PathBuf::from("./cgi-bin"),
             interpreters,
             timeout: Duration::from_secs(30),
@@ -381,8 +379,8 @@ impl Default for LoggingConfig {
     fn default() -> Self {
         LoggingConfig {
             level: "info".to_string(),
-            access_log: Some(PathBuf::from("access.log")),
-            error_log: Some(PathBuf::from("error.log")),
+            access_log: None,
+            error_log: None,
             rotation: LogRotationConfig::default(),
         }
     }
